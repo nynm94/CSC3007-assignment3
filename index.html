@@ -3,8 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        h4 {
+            align-items: center
+        }
+    </style>
 </head>
 
 <body>
@@ -17,22 +23,40 @@
         let svg = d3.select("svg")
             .attr("viewBox", "0 0 " + width + " " + height)
 
-        var colorScale = d3.scaleLinear()
-            .domain([0, 2500])
-            .range(["white", "black"]);
-
-        var legend = d3.legendColor()
-            .scale(colorScale);
-
         // Load external data
-        Promise.all([d3.json("sgmap.json"), d3.csv("population2021.csv")]).then(data => {
-
-            // Map and projection
+        Promise.all([d3.json("data/sgmap.json"), d3.csv("data/population2021.csv")]).then(data => {
+            population_data = []
+            data[0].features.forEach(element => {
+                data[1].forEach(element2 => {
+                    if (element.properties.Name.toLowerCase() == element2.Subzone.toLowerCase()) {
+                        population_data[element.properties.Name] = element2.Population
+                    }
+                })
+            });
+            // Map and projection (geoMercator)
             var projection = d3.geoMercator()
                 .center([103.851959, 1.290270])
                 .fitExtent([[20, 20], [980, 580]], data[0]);
 
             let geopath = d3.geoPath().projection(projection);
+
+            var colorScale = d3.scaleLinear()
+                .domain([0, 64000])
+                .range(["#fff", "#0d152d"]);
+
+            var legend = d3.legendColor()
+                .scale(colorScale)
+                .labelFormat(d3.format(".0f"))
+                .shapeWidth(40)
+                .cells([0,8000,16000,24000,32000,40000,48000,56000,64000])
+                .orient('horizontal')
+                .title("Population");
+
+            svg.append("path")
+                .datum({ type: "Sphere" })
+                .attr("id", "area")
+                .attr("d", geopath)
+                .attr("fill", "#cccccc");
 
             svg.append("g")
                 .attr("id", "districts")
@@ -41,22 +65,38 @@
                 .enter()
                 .append("path")
                 .attr("d", geopath)
-                .attr("fill", "black")
-                .attr("transform", "translate(500,10)")
-                .call(legend)
+                .attr("fill", d => colorScale(population_data[d.properties.Name.toUpperCase()]))
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 0.5)
                 .on("mouseover", (event, d) => {
-                    console.log(d)
                     d3.select(".tooltip")
-                        .text(d.properties.Name)
+                        .html("<h4>" + d.properties.Name + "</h4>" + "Population: " + population_data[d.properties.Name.toUpperCase()])
                         .style("position", "absolute")
                         .style("background", "#fff")
-                        .style("left", (event.pageX) + 50 + "px")
-                        .style("top", (event.pageY) + 50 + "px");
+                        .style("border", "solid")
+                        .style("border-width", "1px")
+                        .style("border-radius", "5px")
+                        .style("opacity", 1)
+                        .style("padding", "10px")
+                        .style("left", 1200 + "px")
+                        .style("top", 600 + "px")
+
+                    let path = d3.select(event.currentTarget)
+                    path.style("stroke", "orange").style("stroke-width", 2);
                 })
                 .on("mouseout", (event, d) => {
                     d3.select(".tooltip")
-                        .text("");
+                        .text("")
+                        .style("opacity", 0);
+
+                    let path = d3.select(event.currentTarget)
+                    path.style("stroke", "#fff").style("stroke-width", 0.5);
                 })
+
+            svg.append("g")
+                .attr("transform", "translate(10,530)")
+                .style("font-size", "10px")
+                .call(legend)
         })
 
     </script>
